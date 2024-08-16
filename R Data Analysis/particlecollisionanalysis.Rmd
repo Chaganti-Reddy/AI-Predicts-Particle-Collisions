@@ -1,0 +1,290 @@
+---
+title: "Particle Collision and Handwritten Digits Data Analysis"
+author: "Arin Vansomphone"
+date: "`r Sys.Date()`"
+output: html_document
+---
+# Loading the Packages
+```{r}
+library(tidyverse)
+library(readr)
+```
+# Sample Size Analysis
+## Importing and Tidying the Data
+```{r warning=FALSE}
+particledata <- read_csv("Particle Physics Sample Data - Sheet1.csv")
+
+particledata_long <- particledata %>%
+  pivot_longer(names_to = "samplesize",
+               values_to = "percentaccuracy",
+               '400' : '3400')
+particledata_long$samplesize <- as.double(particledata_long$samplesize)
+particledata_long
+```
+
+## Finding the Summary Statistics
+```{r}
+particledatastats <- particledata_long %>%
+  group_by(samplesize) %>%
+  summarize(average = mean(percentaccuracy),
+            sd = sd(percentaccuracy),
+            min = min(percentaccuracy),
+            Q1 = quantile(percentaccuracy, probs = 0.25),
+            median = median(percentaccuracy),
+            Q3 = quantile(percentaccuracy, probs = 0.75),
+            max = max(percentaccuracy),
+            IQR = Q3 - Q1) %>%
+  arrange(samplesize)
+particledatastats
+```
+
+## Plotting the Data
+```{r}
+particledata_long %>%
+  ggplot(aes(x = samplesize, y = percentaccuracy)) +
+  geom_point() + 
+  labs(x = "Training Set Size",
+       y = "Accuracy (%) for 100 test samples")
+```
+
+## Linear Regression Tests
+### Weighted least squares
+```{r}
+x = particledata_long$samplesize
+y = particledata_long$percentaccuracy
+
+model <- lm(y ~ x)
+```
+
+```{r}
+# test for heteroscedasticity
+plot(fitted(model), resid(model), xlab = 'Fitted Values', ylab = 'Residual Values')
+
+abline(0,0)
+```
+
+```{r}
+# breusch-pagan test
+library(lmtest)
+
+bptest(model)
+```
+
+```{r}
+wt <- 1 / lm(abs(model$residuals) ~ model$fitted.values)$fitted.values^2
+
+wls_model <- lm(y ~ x, weights = wt)
+
+summary(wls_model)
+```
+
+### Log transformation
+```{r}
+particledata_long$log_accuracy <- log(particledata_long$percentaccuracy)
+particledata_long %>%
+  ggplot(aes(x = samplesize, y = log_accuracy)) +
+  geom_point() + 
+  labs(x = "Sample Size",
+       y = "Accuracy (%) for 175 test samples")
+```
+```{r}
+z <- particledata_long$log_accuracy
+
+log_model <- lm(z ~ x)
+
+summary(log_model)
+```
+
+### Least squares
+```{r}
+particledata_long %>%
+  ggplot(aes(x = samplesize, y = percentaccuracy)) +
+  geom_point() + 
+  labs(x = "Training Set Size",
+       y = "Accuracy (%) for 100 test samples") +
+  geom_smooth(se = FALSE, method = "lm") +
+  geom_line(aes(y=20), color = "red")
+```
+```{r}
+x = particledata_long$samplesize
+y = particledata_long$percentaccuracy
+
+model <- lm(y ~ x)
+
+summary(model)
+```
+
+## Model accuracy vs. random guessing
+```{r}
+particledata500_long <- particledata_long %>%
+  filter(samplesize == 3400)
+
+t.test(particledata500_long$percentaccuracy, mu = 0.20, alternative = 'greater')
+```
+
+## Accuracy Standard Deviation vs. Training Sample Size
+```{r}
+particledatastats %>%
+  ggplot(aes(x = samplesize, y = sd)) + 
+  geom_point() +
+  labs(x = "Sample Size",
+       y = "Standard Deviation of Accuracy (%) for 100 Test Samples") +
+  geom_smooth(se = FALSE, method = 'lm')
+```
+
+### Statistical test for standard deviation
+```{r}
+c = particledatastats$sd
+d = particledatastats$samplesize
+summary(lm(c ~ d))$coefficients
+```
+
+## Boxplot graph
+```{r}
+ggplot(particledata_long, aes(x = samplesize, y = percentaccuracy)) +
+  geom_boxplot(aes(group = samplesize)) +
+  labs(x = "Training Set Size",
+       y = "Accuracy (%) for 100 Test Samples")
+```
+
+# Epoch Data
+## Importing and Tidying the Data
+```{r warning=FALSE}
+epochdata <- read_csv("Particle Physics Epoch Data - Sheet1.csv")
+
+epochdata_long <- epochdata %>%
+  pivot_longer(names_to = "epochs",
+               values_to = "percentaccuracy",
+               '3' : '500')
+
+epochdata_long$epochs <- as.double(epochdata_long$epochs)
+epochdata_long <- epochdata_long %>%
+  na.omit()
+```
+
+## Finding the Summary Statistics
+```{r}
+epochdatastats <- epochdata_long %>%
+  group_by(epochs) %>%
+  summarize(average = mean(percentaccuracy),
+            sd = sd(percentaccuracy),
+            min = min(percentaccuracy),
+            Q1 = quantile(percentaccuracy, probs = 0.25),
+            median = median(percentaccuracy),
+            Q3 = quantile(percentaccuracy, probs = 0.75),
+            max = max(percentaccuracy),
+            IQR = Q3 - Q1) %>%
+  arrange(epochs)
+epochdatastats
+```
+
+## Plotting the Data
+```{r}
+epochdata_long %>%
+  filter(epochs == c(3, 4, 5, 6, 7)) %>%
+  ggplot(aes(x = epochs, y = percentaccuracy)) +
+  geom_point() + 
+  labs(x = "Epochs",
+       y = "Accuracy (%) for 100 test samples")
+```
+
+## Least squares
+```{r}
+epochdata_long %>%
+  filter(epochs == c(3, 4, 5, 6, 7)) %>%
+  ggplot(aes(x = epochs, y = percentaccuracy)) +
+  geom_point() + 
+  labs(x = "Epochs",
+       y = "Accuracy (%) for 100 test samples") +
+  geom_smooth(se = FALSE, method = "lm") +
+  geom_line(aes(y=20), color = "red")
+```
+
+```{r}
+epochdata_long_small <- epochdata_long %>%
+  filter(epochs == c(3, 4, 5, 6, 7))
+
+e = epochdata_long_small$epochs
+f = epochdata_long_small$percentaccuracy
+
+epochmodel <- lm(f ~ e)
+
+summary(epochmodel)
+```
+
+## Accuracy Standard Deviation vs. Training Sample Size
+```{r}
+epochdatastats %>%
+  filter(epochs == c(3, 4, 5, 6, 7)) %>%
+  ggplot(aes(x = epochs, y = sd)) + 
+  geom_point() +
+  labs(x = "Epochs",
+       y = "Standard Deviation of Accuracy (%) for 100 Test Samples") +
+  geom_smooth(se = FALSE, method = 'lm')
+```
+
+### Statistical test for standard deviation
+```{r}
+epochdatastats_small <- epochdatastats %>%
+  filter(epochs == c(3, 4, 5, 6, 7)) 
+
+g = epochdatastats_small$sd
+h = epochdatastats_small$epochs
+summary(lm(h ~ g))$coefficients
+```
+
+# Binary Classification Data
+## Importing and Tidying the Data
+```{r warning=FALSE}
+binarydata <- read_csv("Binary Test Data - Sheet1.csv")
+
+binarydata_long <- binarydata %>%
+  pivot_longer(names_to = "classification",
+               values_to = "percentaccuracy",
+               'Muon' : 'Proton')
+```
+
+## Finding statistics
+```{r}
+binarydatastats <- binarydata_long %>%
+  group_by(classification) %>%
+  summarize(average = mean(percentaccuracy),
+            sd = sd(percentaccuracy),
+            min = min(percentaccuracy),
+            Q1 = quantile(percentaccuracy, probs = 0.25),
+            median = median(percentaccuracy),
+            Q3 = quantile(percentaccuracy, probs = 0.75),
+            max = max(percentaccuracy),
+            IQR = Q3 - Q1) %>%
+  arrange(classification)
+binarydatastats
+```
+
+## Plotting the data
+```{r}
+binarydata_long %>%
+  ggplot(aes(x = classification, y = percentaccuracy)) +
+  geom_point() + 
+  labs(x = "Classification",
+       y = "Accuracy (%) for 100 test samples")
+```
+
+## Boxplot graph
+```{r}
+ggplot(binarydata_long, aes(x = classification, y = percentaccuracy)) +
+  geom_boxplot(aes(group = classification)) +
+  labs(x = "Classification",
+       y = "Accuracy (%) for 100 Test Samples") +
+  scale_y_continuous(limits = c(0,100))
+```
+
+## ANOVA Test
+```{r}
+binary.aov <- aov(percentaccuracy ~ classification, data = binarydata_long)
+
+summary(binary.aov)
+```
+```{r}
+TukeyHSD(binary.aov)
+```
+
