@@ -1,6 +1,6 @@
 # AI-Predicts-Particle-Collisions
 
-This project is an implementation version of [this Paper](./JEI-23-013_FINAL.pdf)
+This project is done using [this Paper](./JEI-23-013_FINAL.pdf)
 
 The code uses TensorFlow to predict particle collision outcomes from a dataset of collision images, in `pkl` format. It outputs the results of the model at different train sample sizes to a `csv` file.
 
